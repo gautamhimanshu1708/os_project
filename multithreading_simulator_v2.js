@@ -44,7 +44,7 @@ function initState(){
   const n=5;
   S.threads=Array.from({length:n},(_,i)=>({
     id:'T'+(i+1), state:ST.N, burst:Math.floor(Math.random()*5)+3,
-    done:0, kid:null, arrivalOrder:i, waitReason:null, hasSemaphore:false
+    done:0, kid:null, arrivalOrder:i, waitReason:null, hasSemaphore:false, arrivalTime:0, completionTime:null
   }));
   const km={'many-to-one':1,'one-to-one':n,'many-to-many':3}[S.model];
   S.kthreads=Array.from({length:km},(_,i)=>({id:'K'+(i+1),busy:false,tid:null}));
@@ -59,8 +59,12 @@ function initState(){
 function resetSim(){
   clearInterval(S.interval);
   S.running=false; S.tick=0; S.logs=[];
-  document.getElementById('btn-start').textContent='Start';
-  document.getElementById('btn-start').className='btn go';
+  const btn = document.getElementById('btn-start');
+  btn.textContent='Start';
+  btn.className='btn go';
+  btn.disabled=false;
+  btn.style.opacity='1';
+  btn.style.cursor='pointer';
   initState();
   renderAll();
   log('Simulator reset.','info');
@@ -173,6 +177,7 @@ function doFCFS(){
 
     if(t.done>=t.burst){
       t.state=ST.T;
+      t.completionTime=S.tick;
       freeKernel(t);
       S.fcfsQueue=S.fcfsQueue.filter(id=>id!==t.id);
       
@@ -289,6 +294,7 @@ function doSJF(){
 
     if(t.done>=t.burst){
       t.state=ST.T;
+      t.completionTime=S.tick;
       freeKernel(t);
       S.sjfQueue=S.sjfQueue.filter(id=>id!==t.id);
       
@@ -374,18 +380,15 @@ function freeKernel(t){
 
 function respawnIfDone(){
   const alive=S.threads.filter(t=>t.state!==ST.T);
-  if(alive.length===0){
-    log('All threads done. Respawning for continuous demo...','warn');
-    S.threads.forEach(t=>{
-      t.state=ST.R; t.done=0;
-      t.burst=Math.floor(Math.random()*5)+3; t.kid=null;
-      t.waitReason=null; t.hasSemaphore=false;
-    });
-    S.kthreads.forEach(k=>{k.busy=false;k.tid=null;});
-    S.semCount = S.semMax;
-    S.buffer = []; S.prodCount = 0;
-    if(S.algo==='fcfs') S.fcfsQueue=S.threads.map(t=>t.id);
-    else { S.sjfQueue=S.threads.map(t=>t.id); sortSJFQueue(); }
+  if(alive.length===0 && S.running){
+    log('All threads completed execution. Press Reset to start again.','ok');
+    S.running=false;
+    clearInterval(S.interval);
+    const btn = document.getElementById('btn-start');
+    btn.textContent='Finished';
+    btn.disabled=true;
+    btn.style.opacity='0.5';
+    btn.style.cursor='not-allowed';
   }
 }
 
@@ -397,6 +400,7 @@ function renderAll(){
   renderQueues();
   renderSync();
   renderGantt();
+  renderTable();
 }
 
 function stClass(st){return{new:'sn',ready:'sr',running:'sR',waiting:'sw',terminated:'sT'}[st]||'sn'}
@@ -565,6 +569,35 @@ function updateStats(){
   document.getElementById('s-rdy').textContent=S.threads.filter(t=>t.state===ST.R).length;
   document.getElementById('s-wait').textContent=S.threads.filter(t=>t.state===ST.W).length;
   document.getElementById('s-done').textContent=S.threads.filter(t=>t.state===ST.T).length;
+}
+
+function renderTable() {
+  const isRR = S.algo === 'rr';
+  const thQuantum = document.getElementById('th-quantum');
+  if (thQuantum) thQuantum.style.display = isRR ? '' : 'none';
+  
+  const tbody = document.getElementById('thread-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = S.threads.map(t => {
+    const arrival = t.arrivalTime;
+    const comp = t.completionTime !== null ? t.completionTime : '-';
+    const currentTick = S.tick;
+    const turnaround = t.state === ST.T ? (t.completionTime - t.arrivalTime) : (currentTick - t.arrivalTime);
+    const waiting = Math.max(0, turnaround - t.done);
+    const quantumSlice = isRR ? (S.currentRR === t.id ? `${S.rrSlice}/${S.quantum}` : `-`) : '';
+    
+    return `<tr>
+      <td>${t.id}</td>
+      <td><span class="status-pill st-${t.state}">${t.state}</span></td>
+      <td>${t.burst}</td>
+      ${isRR ? `<td>${quantumSlice}</td>` : ''}
+      <td>${arrival}</td>
+      <td>${waiting}</td>
+      <td>${turnaround}</td>
+      <td>${comp}</td>
+      <td style="color:${t.kid?'var(--blue)':'var(--muted)'};font-weight:600">${t.kid || '-'}</td>
+    </tr>`;
+  }).join('');
 }
 
 function log(msg,type=''){

@@ -111,6 +111,29 @@
   </div>
 </div>
 
+<div class="panel" style="margin-bottom: 24px;">
+  <div class="ptitle">Thread Statistics</div>
+  <div class="table-wrap" style="overflow-x: auto;">
+    <table class="thread-table" id="thread-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Status</th>
+          <th>Burst</th>
+          <th id="th-quantum" style="display:none">Quantum</th>
+          <th>Arrival Time</th>
+          <th>Waiting Time</th>
+          <th>Turnaround</th>
+          <th>Completion</th>
+          <th>Kernel</th>
+        </tr>
+      </thead>
+      <tbody id="thread-tbody">
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <div class="log-panel" id="log-panel">
   <div class="le"><span class="lt">00:00</span><span class="lm info">Simulator ready. Press Start to begin.</span></div>
 </div>
